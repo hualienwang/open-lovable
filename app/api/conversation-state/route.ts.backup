@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { conversationService } from '@/lib/conversation-service';
+import type { ConversationState } from '@/types/conversation';
+
+declare global {
+  var conversationState: ConversationState | null;
+}
 
 // GET: Retrieve current conversation state
 export async function GET() {
   try {
-    const state = conversationService.getConversationState();
-    
-    if (!state) {
+    if (!global.conversationState) {
       return NextResponse.json({
         success: true,
         state: null,
@@ -16,7 +18,7 @@ export async function GET() {
     
     return NextResponse.json({
       success: true,
-      state
+      state: global.conversationState
     });
   } catch (error) {
     console.error('[conversation-state] Error getting state:', error);
@@ -34,29 +36,51 @@ export async function POST(request: NextRequest) {
     
     switch (action) {
       case 'reset':
-        const newState = conversationService.initializeConversation();
+        global.conversationState = {
+          conversationId: `conv-${Date.now()}`,
+          startedAt: Date.now(),
+          lastUpdated: Date.now(),
+          context: {
+            messages: [],
+            edits: [],
+            projectEvolution: { majorChanges: [] },
+            userPreferences: {}
+          }
+        };
         
         console.log('[conversation-state] Reset conversation state');
         
         return NextResponse.json({
           success: true,
           message: 'Conversation state reset',
-          state: newState
+          state: global.conversationState
         });
         
       case 'clear-old':
-        conversationService.clearOldConversation();
+        // Clear old conversation data but keep recent context
+        if (!global.conversationState) {
+          return NextResponse.json({
+            success: false,
+            error: 'No active conversation to clear'
+          }, { status: 400 });
+        }
+        
+        // Keep only recent data
+        global.conversationState.context.messages = global.conversationState.context.messages.slice(-5);
+        global.conversationState.context.edits = global.conversationState.context.edits.slice(-3);
+        global.conversationState.context.projectEvolution.majorChanges = 
+          global.conversationState.context.projectEvolution.majorChanges.slice(-2);
         
         console.log('[conversation-state] Cleared old conversation data');
         
         return NextResponse.json({
           success: true,
-          message: 'Old conversation data cleared'
+          message: 'Old conversation data cleared',
+          state: global.conversationState
         });
         
       case 'update':
-        const currentState = conversationService.getConversationState();
-        if (!currentState) {
+        if (!global.conversationState) {
           return NextResponse.json({
             success: false,
             error: 'No active conversation to update'
@@ -66,25 +90,28 @@ export async function POST(request: NextRequest) {
         // Update specific fields if provided
         if (data) {
           if (data.currentTopic) {
-            conversationService.setCurrentTopic(data.currentTopic);
+            global.conversationState.context.currentTopic = data.currentTopic;
           }
           if (data.userPreferences) {
-            conversationService.updateUserPreferences(data.userPreferences);
+            global.conversationState.context.userPreferences = {
+              ...global.conversationState.context.userPreferences,
+              ...data.userPreferences
+            };
           }
+          
+          global.conversationState.lastUpdated = Date.now();
         }
-        
-        const updatedState = conversationService.getConversationState();
         
         return NextResponse.json({
           success: true,
           message: 'Conversation state updated',
-          state: updatedState
+          state: global.conversationState
         });
         
       default:
         return NextResponse.json({
           success: false,
-          error: 'Invalid action. Use "reset", "clear-old", or "update"'
+          error: 'Invalid action. Use "reset" or "update"'
         }, { status: 400 });
     }
   } catch (error) {
@@ -99,7 +126,7 @@ export async function POST(request: NextRequest) {
 // DELETE: Clear conversation state
 export async function DELETE() {
   try {
-    conversationService.clearOldConversation();
+    global.conversationState = null;
     
     console.log('[conversation-state] Cleared conversation state');
     
