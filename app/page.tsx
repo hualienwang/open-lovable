@@ -5,8 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { appConfig } from '@/config/app.config';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // Import icons from centralized module to avoid Turbopack chunk issues
 import { 
   FiFile, 
@@ -22,6 +20,10 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import CodeApplicationProgress, { type CodeApplicationState } from '@/components/CodeApplicationProgress';
+import HomeScreen from '@/components/HomeScreen';
+import CodeGenerationDisplay from '@/components/CodeGenerationDisplay';
+import ChatMessages from '@/components/ChatMessages';
+import SandboxPreview from '@/components/SandboxPreview';
 
 interface SandboxData {
   sandboxId: string;
